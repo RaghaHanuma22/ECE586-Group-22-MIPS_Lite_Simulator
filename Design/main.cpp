@@ -1,7 +1,8 @@
 #include <iostream>
 #include <cstdio>
 #include "pkg.h"
-
+#include "sim.h"
+using namespace std;
 int main() {
 
     const char *filename = "testing_img.txt";
@@ -22,10 +23,13 @@ int main() {
             if(sscanf(line,"%x",&address) == 1){
                 printf("\nAddress in Hex: %x",address);
         
-                inst.instr = address; //40 - 0010 0000
+                inst.instr = address; //040 - 0000 0100
+                inst.R_type.opcode = (inst.instr >> 26);
                 printf("\n Instruction = %x",inst.instr);
                 printf("\n I Type: opcode = %x\n",inst.I_type.opcode);
                 printf("\n R Type: opcode = %x\n",inst.R_type.opcode);
+                executeInstruction();
+                //printRegisters();
 
             }
             else {
