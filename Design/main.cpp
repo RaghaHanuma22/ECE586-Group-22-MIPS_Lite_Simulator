@@ -22,7 +22,7 @@ int main() {
             if(sscanf(line,"%x",&address) == 1){
                 printf("\nAddress in Hex: %x",address);
         
-                inst.instr = address; //40 - 0010 0000
+                inst.instr = address; //40 - 0000 0100
                 printf("\n Instruction = %x",inst.instr);
                 printf("\n I Type: opcode = %x\n",inst.I_type.opcode);
                 printf("\n R Type: opcode = %x\n",inst.R_type.opcode);
