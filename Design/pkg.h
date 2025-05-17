@@ -12,10 +12,10 @@ typedef union {
         unsigned int opcode : 6;
     } R_type;
     struct {
-        unsigned int imm : 16;
+        signed int imm : 16;
         unsigned int rt : 5;
         unsigned int rs : 5;
-        signed int opcode : 6;
+        unsigned int opcode : 6;
     } I_type;
 } Instruction;
 
