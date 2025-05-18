@@ -2,7 +2,7 @@
 #include <cstdio>
 #include "pkg.h"
 #include "sim.h"
-using namespace std;
+
 int main() {
 
     const char *filename = "testing_img.txt";
@@ -22,15 +22,12 @@ int main() {
         if(line[0] != '\0' && line[1] != '\0'){
             if(sscanf(line,"%x",&address) == 1){
                 printf("\nAddress in Hex: %x",address);
-        
-                inst.instr = address; //040 - 0000 0100
-                inst.R_type.opcode = (inst.instr >> 26);
+                inst.instr = address; //40 - 0000 0100
                 printf("\n Instruction = %x",inst.instr);
-                printf("\n I Type: opcode = %x\n",inst.I_type.opcode);
-                printf("\n R Type: opcode = %x\n",inst.R_type.opcode);
+                printf("\n I Type: opcode = %x",inst.I_type.opcode);
+                printf("\n R Type: opcode = %x",inst.R_type.opcode);
                 executeInstruction();
-                //printRegisters();
-
+                printRegisters();
             }
             else {
                 printf("\nParsing failed!");
