@@ -3,66 +3,97 @@
 #include <vector>
 #include "pkg.h"
 #include "sim.h"
+#include <cstdlib>
 using namespace std;
+
 
 
 
 // Define opcode values
 enum Opcode {
-    ADD = 000000,
-    ADDI = 000001,
-    SUB = 000010,
-    SUBI = 000011,
-    MUL = 000100,
-    MULI = 000101,
-    OR = 000110,
-    ORI = 000111,
-    AND = 001000,
-    ANDI = 001001,
-    XOR = 001010,
-    XORI = 001011,
+    ADD = 0b000000,
+    ADDI = 0b000001,
+    SUB = 0b000010,
+    SUBI = 0b000011,
+    MUL = 0b000100,
+    MULI = 0b000101,
+    OR = 0b000110,
+    ORI = 0b000111,
+    AND = 0b001000,
+    ANDI = 0b001001,
+    XOR = 0b001010,
+    XORI = 0b001011,
+    LDW =  0b001100
 };
 
 // Simulate 32 general purpose registers
 int registers[32] = {0};
-static unsigned int PC = 0;
+
 
 // ALU logic
 int startop(int opcode, int operand1, int operand2) {
+    int temp = 0;
+    printf("Opcode for now is = %d",opcode);
     switch (opcode) {
+        
         case ADD: {
-            PC+=4;
+            
             return operand1 + operand2;
             break;
         }
         case ADDI: {
-            PC+=4;
+            
             return operand1 + operand2; // Immediate addition
             break;
         }
         case SUB: {
-            PC+=4;
+            
             return operand1 - operand2;
             break;
         }
-        case SUBI: return operand1 - operand2; // Immediate subtraction
+        case SUBI: 
+            
+            return operand1 - operand2; // Immediate subtraction
+            break;
+        case MUL: 
+                
+            return operand1 * operand2;
+            break;
+        case MULI: 
+        
+        return operand1 * operand2; // Immediate multiplication
         break;
-        case MUL: return operand1 * operand2;
+        case OR: 
+        
+        return operand1 | operand2;
         break;
-        case MULI: return operand1 * operand2; // Immediate multiplication
+        case ORI: 
+        
+        return operand1 | operand2; // Immediate OR
         break;
-        case OR: return operand1 | operand2;
+        case AND: 
+        
+        return operand1 & operand2;
         break;
-        case ORI: return operand1 | operand2; // Immediate OR
+        case ANDI: 
+        
+        return operand1 & operand2; // Immediate AND
         break;
-        case AND: return operand1 & operand2;
+        case XOR: 
+        
+        return operand1 ^ operand2;
         break;
-        case ANDI: return operand1 & operand2; // Immediate AND
+        case XORI: 
+        
+        return operand1 ^ operand2; // Immediate XOR
         break;
-        case XOR: return operand1 ^ operand2;
+
+        case LDW:
+        {
+        temp = operand1 + operand2;
+        return memory[temp/4];
         break;
-        case XORI: return operand1 ^ operand2; // Immediate XOR
-        break;
+        }
         default:
             cerr << "Invalid opcode\n";
             //exit(1);
@@ -80,7 +111,7 @@ void executeInstruction() {
  
     // Check if the instruction is immediate or not
     bool isImmediate = (opcode == ADDI || opcode == SUBI || opcode == MULI ||
-                        opcode == ANDI || opcode == ORI || opcode == XORI );
+                        opcode == ANDI || opcode == ORI || opcode == XORI || opcode == LDW );
                         
 
     // Get the values from registers
@@ -97,9 +128,9 @@ void executeInstruction() {
 
 
 void printRegisters() {
-    cout << "Registers:\n";
+    cout << "\nRegisters:\n";
     for (int i = 0; i < 32; ++i) {
         cout << "R" << i << ": " << registers[i] << "\n";
     }
-    printf("PC: %0d\n",PC);
+    printf("PC: %0d\n",(PC+1)*4);
 }
