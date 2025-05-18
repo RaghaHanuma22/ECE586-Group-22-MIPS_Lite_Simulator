@@ -5,5 +5,8 @@
 
 Instruction inst; 
 
+unsigned int memory[MEMORY_SIZE];
+unsigned int PC = 0;
+
 
 

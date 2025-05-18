@@ -2,6 +2,11 @@
 #define PKG_H
 
 
+#define MEMORY_SIZE 2048  // Define memory size (adjust as needed)
+#define PROGRAM_START 0   // Starting point for program code
+extern unsigned int PC;
+
+
 typedef union {
     unsigned int instr;
     struct {
@@ -21,5 +26,5 @@ typedef union {
 
 
 extern Instruction inst;
-
+extern unsigned int memory[MEMORY_SIZE];
 #endif
