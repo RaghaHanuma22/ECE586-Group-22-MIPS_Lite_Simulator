@@ -42,7 +42,7 @@ loadMemory(filename);
 // Option 1: Execute instructions from the same memory image
 printf("\n\n--- Option 1: Executing instructions from memory ---");
 
-unsigned int instruction_count = 11;
+unsigned int instruction_count = 25;
 
 for(int i = 0; i < instruction_count; i++) {
     unsigned int instr_address = memory[PC];

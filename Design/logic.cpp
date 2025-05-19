@@ -23,7 +23,8 @@ enum Opcode {
     ANDI = 0b001001,
     XOR = 0b001010,
     XORI = 0b001011,
-    LDW =  0b001100
+    LDW =  0b001100,
+    SDW = 0b001101
 };
 
 // Simulate 32 general purpose registers
@@ -91,12 +92,20 @@ int startop(int opcode, int operand1, int operand2) {
         case LDW:
         {
         temp = operand1 + operand2;
-        return memory[temp/4];
+        return memory[temp/4];        
         break;
         }
+     
+       
+        case SDW:
+        {
+        break;
+        } 
+
         default:
             cerr << "Invalid opcode\n";
             //exit(1);
+            break;
     }
 }
 
@@ -118,6 +127,12 @@ void executeInstruction() {
     int operand1 = registers[rs];
     int operand2 = isImmediate ? immediate : registers[rt];
     int result = startop(opcode, operand1, operand2);
+
+    if(opcode==SDW){
+        int temp = rs + immediate;
+        memory[temp/4] = registers[rt];
+        printf("\nData written at %0d is %0d",temp/4,registers[rt]);
+    }
 
     // For all instructions, immediate or not, store result in rt (I-type) or rd (R-type)
     if (isImmediate)
