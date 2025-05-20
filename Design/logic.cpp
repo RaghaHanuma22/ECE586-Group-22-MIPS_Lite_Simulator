@@ -24,15 +24,20 @@ enum Opcode {
     XOR = 0b001010,
     XORI = 0b001011,
     LDW =  0b001100,
-    SDW = 0b001101
+    SDW = 0b001101,
+    BZ =  0b001110,
+    BEQ = 0b001111,
+    JR =  0b010000,
+    HALT = 0b010001
 };
 
 // Simulate 32 general purpose registers
-int registers[32] = {0};
+int registers[31] = {0};
+const int R0 = 0;
 
 
 // ALU logic
-int startop(int opcode, int operand1, int operand2) {
+int startop(int opcode, int operand1, int operand2, int location) {
     int temp = 0;
     printf("Opcode for now is = %d",opcode);
     switch (opcode) {
@@ -102,9 +107,36 @@ int startop(int opcode, int operand1, int operand2) {
         break;
         } 
 
+        case BZ:
+        if(operand1 == 0) {
+            return operand2;
+        }
+        else {
+            return PC;
+        }
+        break;
+
+        case BEQ:
+        if(operand1 == operand2){
+            return location;
+        }
+        else {
+            return PC;
+        }
+        break;
+
+        case JR:
+        return operand1;
+        break;
+
+        case HALT:
+        printf("Halt instruction executed! Terminating program!");
+        exit(0);
+        break;
+
         default:
             cerr << "Invalid opcode\n";
-            //exit(1);
+            exit(1);
             break;
     }
 }
@@ -120,14 +152,16 @@ void executeInstruction() {
  
     // Check if the instruction is immediate or not
     bool isImmediate = (opcode == ADDI || opcode == SUBI || opcode == MULI ||
-                        opcode == ANDI || opcode == ORI || opcode == XORI || opcode == LDW );
+                        opcode == ANDI || opcode == ORI || opcode == XORI || opcode == LDW || opcode == BZ || opcode == BEQ);
                         
 
     // Get the values from registers
     int operand1 = registers[rs];
-    int operand2 = isImmediate ? immediate : registers[rt];
-    int result = startop(opcode, operand1, operand2);
+    int operand2 = (opcode == BEQ)? registers[rt] : isImmediate ? immediate : registers[rt];
+    int location = (opcode == BEQ)? immediate : 0;
+    int result = startop(opcode, operand1, operand2,location);
 
+    //For store word instructions
     if(opcode==SDW){
         int temp = rs + immediate;
         memory[temp/4] = registers[rt];
@@ -135,8 +169,13 @@ void executeInstruction() {
     }
 
     // For all instructions, immediate or not, store result in rt (I-type) or rd (R-type)
-    if (isImmediate)
+    if (isImmediate & ~(opcode == BZ))
         registers[rt] = result;
+    else if (opcode == BZ | opcode == BEQ | opcode == JR)
+    {
+        PC = result;
+    }
+    
     else
         registers[rd] = result;
 }
@@ -144,7 +183,8 @@ void executeInstruction() {
 
 void printRegisters() {
     cout << "\nRegisters:\n";
-    for (int i = 0; i < 32; ++i) {
+    cout << "R0: " <<R0 << "\n";
+    for (int i = 1; i < 32; ++i) {
         cout << "R" << i << ": " << registers[i] << "\n";
     }
     printf("PC: %0d\n",(PC+1)*4);
