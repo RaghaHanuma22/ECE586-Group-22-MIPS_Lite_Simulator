@@ -36,13 +36,13 @@
 int main() {
 
 
-const char *filename = "ece586_sample_memory_image.txt";
+const char *filename = "lw_test.txt";
 loadMemory(filename);
 
 // Option 1: Execute instructions from the same memory image
 printf("\n\n--- Option 1: Executing instructions from memory ---");
 
-unsigned int instruction_count = 25;
+unsigned int instruction_count = 3;
 
 for(int i = 0; i < instruction_count; i++) {
     unsigned int instr_address = memory[PC];
