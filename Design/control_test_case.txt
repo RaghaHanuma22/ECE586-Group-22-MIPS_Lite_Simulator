@@ -1,9 +1,14 @@
-040103E8
-040204B0
-04060001
-00003800
-00004000
-00004800
-00005000
-38C00002
-00003800
+//addi
+040103E8 // this will store 2000 in r1
+040507D0 // this will store 2000 in r5 
+04A207D0 // this will add 2000 with r5(2000) and store in r2 = 4000
+
+//sub 
+08401800 // sub x3, x0, x2
+08411800 // sub x3 , x1, x2
+
+// mul
+10223800 // mul x7,x1, x2
+
+
+44000000 //HALT
