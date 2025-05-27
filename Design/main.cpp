@@ -2,6 +2,7 @@
 #include <cstdio>
 #include "pkg.h"
 #include "sim.h"
+#include "timing.h"
 #include <cstdlib>
 
 
@@ -36,7 +37,7 @@
 int main() {
 
 
-const char *filename = "lw_test.txt";
+const char *filename = "store_word_test.txt";
 loadMemory(filename);
 
 // Option 1: Execute instructions from the same memory image
@@ -48,9 +49,12 @@ for(int i = 0; i < instruction_count; i++) {
     unsigned int instr_address = memory[PC];
 
     inst.instr = instr_address;
+
+   
     executeInstruction();
     printRegisters();
     PC+=1;
+    print_mem();
 
 }
     return 0;

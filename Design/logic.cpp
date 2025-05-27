@@ -104,6 +104,7 @@ int startop(int opcode, int operand1, int operand2, int location) {
        
         case SDW:
         {
+            return 0; // for debug 
         break;
         } 
 
@@ -163,10 +164,11 @@ void executeInstruction() {
 
     //For store word instructions
     if(opcode==SDW){
-        int temp = rs + immediate;
+        int temp = registers[rs] + immediate;
         memory[temp/4] = registers[rt];
         printf("\nData written at %0d is %0d",temp/4,registers[rt]);
     }
+
 
     // For all instructions, immediate or not, store result in rt (I-type) or rd (R-type)
     if (isImmediate & ~(opcode == BZ))
@@ -188,4 +190,13 @@ void printRegisters() {
         cout << "R" << i << ": " << registers[i] << "\n";
     }
     printf("PC: %0d\n",(PC+1)*4);
+}
+
+void print_mem() {
+    cout << "\nMemory:\n";
+    for (int i = 0; i < 6; ++i) {
+        if (memory[i] != 0) { // Print only non-zero memory locations
+            cout << "Address " << i * 4 << ": " << memory[i] << "\n";
+        }
+    }
 }
