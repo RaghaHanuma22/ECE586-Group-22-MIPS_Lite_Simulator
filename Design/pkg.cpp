@@ -5,7 +5,7 @@
 
 Instruction inst; 
 
-unsigned int memory[MEMORY_SIZE];
+unsigned int memory[MEMORY_SIZE] = {0};
 unsigned int PC = 0;
 
 

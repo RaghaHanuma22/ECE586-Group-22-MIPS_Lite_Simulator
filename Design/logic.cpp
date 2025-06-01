@@ -34,12 +34,14 @@ enum Opcode {
 // Simulate 32 general purpose registers
 int registers[31] = {0};
 const int R0 = 0;
+int d_memory[MEMORY_SIZE] = {0};
+
 
 
 // ALU logic
 int startop(int opcode, int operand1, int operand2, int location) {
     int temp = 0;
-    printf("Opcode for now is = %d",opcode);
+    printf("\nOpcode for now is = %d\n",opcode);
     switch (opcode) {
         
         case ADD: {
@@ -132,7 +134,8 @@ int startop(int opcode, int operand1, int operand2, int location) {
 
         case HALT:
         printf("Halt instruction executed! Terminating program!");
-        exit(0);
+        
+        //exit(0);
         break;
 
         default:
@@ -165,7 +168,7 @@ void executeInstruction() {
     //For store word instructions
     if(opcode==SDW){
         int temp = registers[rs] + immediate;
-        memory[temp/4] = registers[rt];
+        d_memory[temp/4] = registers[rt];
         printf("\nData written at %0d is %0d",temp/4,registers[rt]);
     }
 
@@ -183,20 +186,21 @@ void executeInstruction() {
 }
 
 
-void printRegisters() {
-    cout << "\nRegisters:\n";
+void printstate() {
+    
+    cout << "\nRegisters that have been changed during runtime:\n";
     cout << "R0: " <<R0 << "\n";
     for (int i = 1; i < 32; ++i) {
+        if(registers[i]){
         cout << "R" << i << ": " << registers[i] << "\n";
+        }
     }
-    printf("PC: %0d\n",(PC+1)*4);
-}
+    printf("\nPC: %0d\n",(PC+1)*4);
 
-void print_mem() {
     cout << "\nMemory:\n";
-    for (int i = 0; i < 6; ++i) {
-        if (memory[i] != 0) { // Print only non-zero memory locations
-            cout << "Address " << i * 4 << ": " << memory[i] << "\n";
+    for (int i = 0; i < 2048; i++) {
+        if (d_memory[i] != 0) { // Print only non-zero memory locations
+            cout << "Address " << i * 4 << ": " << d_memory[i] << "\n";
         }
     }
 }

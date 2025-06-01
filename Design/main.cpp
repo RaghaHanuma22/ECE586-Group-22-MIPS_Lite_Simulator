@@ -34,66 +34,42 @@
         fclose(fd);
     }
 
-int main() {
+int main(int argc, char* argv[]) {
 
+    const char *filename =argv[1];
 
-const char *filename = "store_word_test.txt";
 loadMemory(filename);
 
 // Option 1: Execute instructions from the same memory image
-printf("\n\n--- Option 1: Executing instructions from memory ---");
+printf("\n\n--- Option 1: Executing instructions from memory ---\n");
 
-unsigned int instruction_count = 3;
+unsigned int instruction_count = 5;
 
 for(int i = 0; i < instruction_count; i++) {
     unsigned int instr_address = memory[PC];
 
     inst.instr = instr_address;
 
-   
+   if(inst.I_type.opcode == 0b010001){
+    printf("Halt instruction executed! Terminating program!");
+    break;
+   }
+   else if(inst.instr ==0x00000000){
+    continue;
+   }
+   else{
     executeInstruction();
-    printRegisters();
     PC+=1;
-    print_mem();
+   }
+    
+    
 
 }
+//PIPELINE SIMULATOR FUNCTION
+pipesim(filename);
+ display();
+ printstate();
+
+ pipe_stats();
     return 0;
 }
-
-
-
-
-/*
-
-    const char *filename = "testing_img.txt";
-    FILE *fd = fopen(filename, "r");
-
-    if(fd) {
-        printf("\nFile opened");
-    }
-    else {
-        printf("\nFile not opened");
-    }
-
-    char line[256];  // Buffer to hold each line
-    unsigned int address;
-
-    while(fgets(line,sizeof(line),fd)) {
-        if(line[0] != '\0' && line[1] != '\0'){
-            if(sscanf(line,"%x",&address) == 1){
-                printf("\nAddress in Hex: %x",address);
-                inst.instr = address; //40 - 0000 0100
-                printf("\n Instruction = %x",inst.instr);
-                printf("\n I Type: opcode = %x",inst.I_type.opcode);
-                printf("\n R Type: opcode = %x",inst.R_type.opcode);
-                executeInstruction();
-                printRegisters();
-            }
-            else {
-                printf("\nParsing failed!");
-            }
-        }
-    }
-
-    fclose(fd);
-    */
