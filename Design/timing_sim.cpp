@@ -18,31 +18,35 @@ using namespace std;
 // Global variables for timing simulation
 static int PPC = 0;
 int mem_size = 0;
-int pregisters[32] = {0}; // Changed to 32 registers (including R0)
+int pregisters[32] = {0}; 
 const int pr0 = 0;
 
-// Statistics tracking variables (similar to mips_hazards.c)
-int ArithmeticInst = 0;
-int LogicalInst = 0;
-int MemoryInst = 0;
-int ControlInst = 0;
-int TotalInstructions = 0;
+
+int Arith_instns = 0;
+int Logical_instns = 0;
+int Memory_instns = 0;
+int Control_instns = 0;
+int Total_instns = 0;
 int Stalls = 0;
-int FrwdStalls = 0;
+int ldw_stalls = 0;
 int Penalties = 0;
 int Instn_idx = 0; // Current instruction index
-bool DReg[32] = {false}; // Track which registers were modified
-vector<int> DynInstList(MAX_INSTRUCTIONS); // Dynamic instruction list
-vector<int> RawHazDict(MAX_INSTRUCTIONS, 0); // RAW hazard tracking
-vector<int> Flag2Dict(MAX_INSTRUCTIONS, 0); // Branch penalty tracking
-vector<bool> BranchFlag(MAX_INSTRUCTIONS, false); // Branch instruction tracking
+bool written_regs[32] = {false}; 
+vector<int> instn_lst(MAX_INSTRUCTIONS); // instruction list
+vector<int> RAWhaz(MAX_INSTRUCTIONS, 0); // RAW hazard tracking
+vector<int> branch_pen(MAX_INSTRUCTIONS, 0); // Branch penalty tracking
+vector<bool> branch_instns(MAX_INSTRUCTIONS, false); // Branch instruction count
+
+// NEW: Track branch penalties properly
+int lastBranchPC = -1;
+int branchTargetPC = -1;
 
 // Memory tracking structure
 struct MemEntry {
     int address;
     int value;
 };
-vector<MemEntry> MemDict;
+vector<MemEntry> memory_entries;
 int memEntryCount = 0;
 
 typedef enum {
@@ -73,24 +77,24 @@ element_t pipeline[5] = {stall, stall, stall, stall, stall};
 void updateInstructionStats(opcode_t opcode) {
     switch(opcode) {
         case ADD: case ADDI: case SUB: case SUBI: case MUL: case MULI:
-            ArithmeticInst++;
+            Arith_instns++;
             break;
         case OR: case ORI: case AND: case ANDI: case XOR: case XORI:
-            LogicalInst++;
+            Logical_instns++;
             break;
         case LDW: case STW:
-            MemoryInst++;
+            Memory_instns++;
             break;
-        case BZ: case BEQ: case JR:
-            ControlInst++;
+        case BZ: case BEQ: case JR: case HALT:
+            Control_instns++;
             break;
         default:
             break;
     }
-    TotalInstructions++;
+    Total_instns++;
 }
-/*
-bool isDataHazard(element_t current, element_t previous) {
+
+bool isRAWhaz(element_t current, element_t previous) {
     // Check if previous instruction writes to a register that current instruction reads
     if (previous.optype == RTYPE && previous.rd != -1) {
         if (previous.rd == current.rs || previous.rd == current.rt) {
@@ -104,67 +108,7 @@ bool isDataHazard(element_t current, element_t previous) {
     return false;
 }
 
-void stallsInjection(element_t* memImage) {
-    if (Instn_idx == 0) return;
-
-    element_t curr = memImage[Instn_idx];
-    
-    // Check 1-instruction back for hazards
-    if (Instn_idx >= 1) {
-        element_t prev1 = memImage[Instn_idx - 1];
-        if (isDataHazard(curr, prev1)) {
-            if (prev1.opcode == LDW || prev1.opcode == STW) {
-                FrwdStalls++; //Stall counter when we are fowarding but instn stalls because of LDW|STW
-            }
-            Stalls += 2; //No forwarding stalls
-            RawHazDict[Instn_idx] = -1;
-            return;
-        }
-    }
-
-    // Check 2-instructions back for hazards
-    if (Instn_idx >= 2) {
-        element_t prev2 = memImage[Instn_idx - 2];
-        if (isDataHazard(curr, prev2)) {
-            Stalls += 1;
-            RawHazDict[Instn_idx] = -2;
-            return;
-        }
-    }
-}
-
-void hazardsChecker(element_t* memImage) {
-    if (Instn_idx == 0) return;
-    
-    // Check for branch penalties
-    if (Instn_idx >= 1 && BranchFlag[Instn_idx-1]) {
-        Penalties += 2;
-        Flag2Dict[Instn_idx] = -1;
-        return;
-    }
-    if (Instn_idx >= 2 && BranchFlag[Instn_idx-2]) {
-        stallsInjection(memImage);
-        return;
-    }
-    stallsInjection(memImage);
-}*/
-
-
-bool isDataHazard(element_t current, element_t previous) {
-    // Check if previous instruction writes to a register that current instruction reads
-    if (previous.optype == RTYPE && previous.rd != -1) {
-        if (previous.rd == current.rs || previous.rd == current.rt) {
-            return true;
-        }
-    } else if (previous.optype == ITYPE && previous.rt != -1) {
-        if (previous.rt == current.rs || previous.rt == current.rt) {
-            return true;
-        }
-    }
-    return false;
-}
-
-void stallsInjection(element_t* memImage, int currentPC) {
+void inject_stalls(element_t* memImage, int currentPC) {
     if (currentPC == 0) return;
 
     element_t curr = memImage[currentPC];
@@ -172,18 +116,19 @@ void stallsInjection(element_t* memImage, int currentPC) {
     // Check 1-instruction back for hazards
     if (currentPC >= 1) {
         element_t prev1 = memImage[currentPC - 1];
-        if (isDataHazard(curr, prev1)) {
+        element_t prev2 = memImage[currentPC - 2];
+        if (isRAWhaz(curr, prev1)) {
             // WITHOUT forwarding: Always need 2 stalls for 1-instruction separation
             if (prev1.opcode == LDW) {
                 // Load-use hazard: even with forwarding, still needs 1 stall
-                FrwdStalls += 1; // Stall counter for forwarding case
+                ldw_stalls += 1; // Stall counter for forwarding case
                 Stalls += 2;     // Stalls for no-forwarding case
-                RawHazDict[Instn_idx] = -1; // Indicates 2-cycle stall
+                RAWhaz[Instn_idx] = -1; // Indicates 2-cycle stall
             } else {
                 // Regular ALU operation hazard
                 Stalls += 2;     // Without forwarding: 2 stalls needed
-                RawHazDict[Instn_idx] = -1; // Indicates 2-cycle stall
-                // With forwarding: no additional stalls needed (FrwdStalls += 0)
+                RAWhaz[Instn_idx] = -1; // Indicates 2-cycle stall
+                // With forwarding: no additional stalls needed (ldw_stalls += 0)
             }
             return;
         }
@@ -192,7 +137,7 @@ void stallsInjection(element_t* memImage, int currentPC) {
     // Check 2-instructions back for hazards
     if (currentPC >= 2) {
         element_t prev2 = memImage[currentPC - 2];
-        if (isDataHazard(curr, prev2)) {
+        if (isRAWhaz(curr, prev2)) {
             // With 2-instruction separation, the hazard resolves naturally
             // No stalls needed even without forwarding
             return;
@@ -200,20 +145,20 @@ void stallsInjection(element_t* memImage, int currentPC) {
     }
 }
 
-void hazardsChecker(element_t* memImage) {
+void check_hazards(element_t* memImage) {
     if (PPC == 0) return;
     
-    // Check for branch penalties
-    if (PPC >= 1 && BranchFlag[PPC-1]) {
-        Penalties += 2;
-        Flag2Dict[Instn_idx] = -1;
-        return;
+    // CORRECTED: Check if we just arrived at a branch target
+    if (lastBranchPC != -1 && PPC == branchTargetPC) {
+        Penalties += 2;            // Add branch misprediction penalty
+        branch_pen[Instn_idx] = -1; // Mark this instruction as affected by branch penalty
+        lastBranchPC = -1;         // Reset the branch tracking
+        branchTargetPC = -1;
+        return;                    // Skip further hazard checks this cycle
     }
-    if (PPC >= 2 && BranchFlag[PPC-2]) {
-        stallsInjection(memImage, PPC);
-        return;
-    }
-    stallsInjection(memImage, PPC);
+    
+    // Otherwise, continue with normal hazard checking for data hazards
+    inject_stalls(memImage, PPC);
 }
 
 int executeInstruction(element_t instr) {
@@ -223,69 +168,69 @@ int executeInstruction(element_t instr) {
         case ADD:
             result = pregisters[instr.rs] + pregisters[instr.rt];
             pregisters[instr.rd] = result;
-            DReg[instr.rd] = true;
+            written_regs[instr.rd] = true;
             break;
         case ADDI:
             result = pregisters[instr.rs] + instr.imm;
             pregisters[instr.rt] = result;
-            DReg[instr.rt] = true;
+            written_regs[instr.rt] = true;
             break;
         case SUB:
             result = pregisters[instr.rs] - pregisters[instr.rt];
             pregisters[instr.rd] = result;
-            DReg[instr.rd] = true;
+            written_regs[instr.rd] = true;
             break;
         case SUBI:
             result = pregisters[instr.rs] - instr.imm;
             pregisters[instr.rt] = result;
-            DReg[instr.rt] = true;
+            written_regs[instr.rt] = true;
             break;
         case MUL:
             result = pregisters[instr.rs] * pregisters[instr.rt];
             pregisters[instr.rd] = result;
-            DReg[instr.rd] = true;
+            written_regs[instr.rd] = true;
             break;
         case MULI:
             result = pregisters[instr.rs] * instr.imm;
             pregisters[instr.rt] = result;
-            DReg[instr.rt] = true;
+            written_regs[instr.rt] = true;
             break;
         case OR:
             result = pregisters[instr.rs] | pregisters[instr.rt];
             pregisters[instr.rd] = result;
-            DReg[instr.rd] = true;
+            written_regs[instr.rd] = true;
             break;
         case ORI:
             result = pregisters[instr.rs] | instr.imm;
             pregisters[instr.rt] = result;
-            DReg[instr.rt] = true;
+            written_regs[instr.rt] = true;
             break;
         case AND:
             result = pregisters[instr.rs] & pregisters[instr.rt];
             pregisters[instr.rd] = result;
-            DReg[instr.rd] = true;
+            written_regs[instr.rd] = true;
             break;
         case ANDI:
             result = pregisters[instr.rs] & instr.imm;
             pregisters[instr.rt] = result;
-            DReg[instr.rt] = true;
+            written_regs[instr.rt] = true;
             break;
         case XOR:
             result = pregisters[instr.rs] ^ pregisters[instr.rt];
             pregisters[instr.rd] = result;
-            DReg[instr.rd] = true;
+            written_regs[instr.rd] = true;
             break;
         case XORI:
             result = pregisters[instr.rs] ^ instr.imm;
             pregisters[instr.rt] = result;
-            DReg[instr.rt] = true;
+            written_regs[instr.rt] = true;
             break;
         case LDW:
             {
                 int address = pregisters[instr.rs] + instr.imm;
                 result = memory[address/4];
                 pregisters[instr.rt] = result;
-                DReg[instr.rt] = true;
+                written_regs[instr.rt] = true;
             }
             break;
         case STW:
@@ -294,23 +239,34 @@ int executeInstruction(element_t instr) {
                 memory[address/4] = pregisters[instr.rt];
                 // Track memory stores
                 MemEntry entry = {address, pregisters[instr.rt]};
-                MemDict.push_back(entry);
+                memory_entries.push_back(entry);
                 memEntryCount++;
             }
             break;
         case BZ:
-            BranchFlag[Instn_idx] = true;
-            if (pregisters[instr.rs] == 0)
-                return PPC + instr.imm;
+            branch_instns[Instn_idx] = true;
+            if (pregisters[instr.rs] == 0) {
+                // Branch taken - record for penalty tracking
+                lastBranchPC = PPC;
+                branchTargetPC = PPC + instr.imm;
+                return branchTargetPC;
+            }
             return PPC + 1;
         case BEQ:
-            BranchFlag[Instn_idx] = true;
-            if (pregisters[instr.rs] == pregisters[instr.rt])
-                return PPC + instr.imm;
+            branch_instns[Instn_idx] = true;
+            if (pregisters[instr.rs] == pregisters[instr.rt]) {
+                // Branch taken - record for penalty tracking
+                lastBranchPC = PPC;
+                branchTargetPC = PPC + instr.imm;
+                return branchTargetPC;
+            }
             return PPC + 1;
         case JR:
-            BranchFlag[Instn_idx] = true;
-            return pregisters[instr.rs] / 4; // Convert to word address
+            branch_instns[Instn_idx] = true;
+            // Branch taken - record for penalty tracking
+            lastBranchPC = PPC;
+            branchTargetPC = pregisters[instr.rs] / 4; // Convert to word address
+            return branchTargetPC;
         case HALT:
             return PPC;
         default:
@@ -322,65 +278,27 @@ int executeInstruction(element_t instr) {
 // Display function (adapted from mips_hazards.c)
 void display() {
     
-    cout << "======================================================================" << endl;
-    cout << "                     Simulation Summary" << endl;
-    cout << "======================================================================" << endl;
-    cout << "Total instructions       : " << TotalInstructions << endl;
-    cout << "  Arithmetic             : " << ArithmeticInst << endl;
-    cout << "  Logical                : " << LogicalInst << endl;
-    cout << "  Memory (LD/ST)         : " << MemoryInst << endl;
-    cout << "  Control (branches,jr)  : " << ControlInst << endl;
-    cout << "----------------------------------------------------------------------" << endl;
-
-    cout << "----------------------------------------------------------------------" << endl;
-
-    cout << "----------------------------------------------------------------------" << endl;
+    cout << "Instruction counts:\n "; 
+    cout<<  " Total number of instructions: "<< Total_instns << endl;
+    cout << "  Arithmetic Instructions             : " << Arith_instns << endl;
+    cout << "  Logical Instructions                : " << Logical_instns << endl;
+    cout << "  Memory access         : " << Memory_instns << endl;
+    cout << "  Control transfer instructions  : " << Control_instns << endl;
+    cout << "\n----------------------------------------------------------------------" << endl;
 }
-/*
-void pipe_stats() {
+
+void pipe_stats(int mode) {
     // Calculate hazard statistics
     int hazardCount = 0, single = 0, dbl = 0, branchCount = 0;
     for (int i = 0; i < Instn_idx; i++) {
-        if (RawHazDict[i] != 0) {
-            hazardCount++;
-            if (RawHazDict[i] == -2) single++;
-            else if (RawHazDict[i] == -1) dbl++;
-        }
-        if (Flag2Dict[i] != 0) branchCount++;
-    }
-    
-    double avgStalls = hazardCount ? ((double)Stalls)/hazardCount : 0.0;
-    double avgBranchPenalty = branchCount ? ((double)Penalties)/branchCount : 0.0;
-    int totalCyclesNoFwd = Instn_idx + 5 + Stalls + Penalties;
-    int totalCyclesFwd = Instn_idx + 5 + FrwdStalls + Penalties;
-    double speedup = totalCyclesNoFwd > 0 ? (double)totalCyclesNoFwd / totalCyclesFwd : 1.0;
-
-    cout << "\nStalls (no forwarding)      : " << Stalls << endl;
-    cout << "  avg  cycles/hazard        : " << fixed << setprecision(5) << avgStalls << endl;
-    cout << "  single-cycle stalls       : " << single << endl;
-    cout << "  double-cycle stalls       : " << dbl << endl;
-    cout << "Branch penalties            : " << Penalties << " cycles (in " << branchCount << " branches)" << endl;
-    cout << "  avg cycles/branch         : " << fixed << setprecision(5) << avgBranchPenalty << endl;
-    cout << "Stalls (with forwarding)    : " << FrwdStalls << endl;
-    cout << "Total cycles w/o forwarding : " << totalCyclesNoFwd << endl;
-    cout << "Total cycles with forwarding: " << totalCyclesFwd << endl;
-    cout << "Speedup                     : " << fixed << setprecision(5) << speedup << "×" << endl;
-    //cout <<"Final PPC                    : " <<PPC <<endl;
-    cout << "======================================================================" << endl;
-}*/
-
-void pipe_stats() {
-    // Calculate hazard statistics
-    int hazardCount = 0, single = 0, dbl = 0, branchCount = 0;
-    for (int i = 0; i < Instn_idx; i++) {
-        if (RawHazDict[i] != 0) {
+        if (RAWhaz[i] != 0) {
             hazardCount++;
             // Note: We removed 2-instruction separation stalls (-2), 
             // so single should be 0 now
-            if (RawHazDict[i] == -2) single++;      // Should be 0 with corrected logic
-            else if (RawHazDict[i] == -1) dbl++;    // 2-cycle stalls for 1-instruction separation
+            if (RAWhaz[i] == -2) single++;      // Should be 0 with corrected logic
+            else if (RAWhaz[i] == -1) dbl++;    // 2-cycle stalls for 1-instruction separation
         }
-        if (Flag2Dict[i] != 0) branchCount++;
+        if (branch_pen[i] != 0) branchCount++;
     }
     
     // With corrected logic: hazardCount should equal dbl (all remaining hazards are 2-cycle)
@@ -389,21 +307,32 @@ void pipe_stats() {
     
     // Total cycles calculation:
     // Base execution: Instn_idx instructions + 5 pipeline latency
-    int totalCyclesNoFwd = Instn_idx + 5 + Stalls + Penalties;
-    int totalCyclesFwd = Instn_idx + 5 + FrwdStalls + Penalties;
-    double speedup = totalCyclesFwd > 0 ? (double)totalCyclesNoFwd / totalCyclesFwd : 1.0;
-
-    cout << "\nStalls (no forwarding)      : " << Stalls << endl;
+    int total_cycles_wo_fwd = Instn_idx + 5 + Stalls + Penalties;
+    int total_cycles_w_fwd = Instn_idx + 5 + ldw_stalls + Penalties;
+    #ifdef DEBUG
+    double speedup = total_cycles_w_fwd > 0 ? (double)total_cycles_wo_fwd / total_cycles_w_fwd : 1.0;
+   
     cout << "  avg  cycles/hazard        : " << fixed << setprecision(5) << avgStalls << endl;
     cout << "  single-cycle stalls       : " << single << endl;
     cout << "  double-cycle stalls       : " << dbl << endl;
-    cout << "Branch penalties            : " << Penalties << " cycles (in " << branchCount << " branches)" << endl;
+    
     cout << "  avg cycles/branch         : " << fixed << setprecision(5) << avgBranchPenalty << endl;
-    cout << "Stalls (with forwarding)    : " << FrwdStalls << endl;
-    cout << "Total cycles w/o forwarding : " << totalCyclesNoFwd << endl;
-    cout << "Total cycles with forwarding: " << totalCyclesFwd << endl;
-    cout << "Speedup                     : " << fixed << setprecision(5) << speedup << "×" << endl;
-    //cout <<"Final PPC                    : " <<PPC <<endl;
+    
+    #endif
+    cout<<"Timing Simulator"<<endl;
+    if(mode==0){
+        cout<<"Timing simulator only available in mode 1 and 2!"<<endl;
+    }
+    if(mode==1) {
+    cout << "Total cycles w/o forwarding : " << total_cycles_wo_fwd << endl;
+    cout << "Branch Penalty            : " << Penalties << " cycles"<< endl;
+    cout << "\nStalls (no forwarding)      : " << Stalls << endl;
+    }
+    if(mode==2){
+    cout << "Total cycles with forwarding: " << total_cycles_w_fwd << endl;
+    cout << "Branch Penalty            : " << Penalties << " cycles"<<endl;
+    cout << "Stalls (with forwarding)    : " << ldw_stalls << endl;
+    }
     cout << "======================================================================" << endl;
 }
 
@@ -417,10 +346,6 @@ int pipesim(const char* filename) {
     int clk = 0;
 
     memImage = fileToMemory(filename);
-
-    cout << "\n=== Pipeline Execution Trace ===" << endl;
-    cout << "| Cycle | Instruction | PC   | Action" << endl;
-    cout << "-------------------------------------" << endl;
 
     while(PPC < mem_size && memImage[PPC].opcode != HALT) {
         // Store current instruction in dynamic list
@@ -437,57 +362,43 @@ int pipesim(const char* filename) {
         }
         
 
-        DynInstList[Instn_idx] = current_instruction;                   
+        instn_lst[Instn_idx] = current_instruction;                   
         // Update instruction statistics
         updateInstructionStats(memImage[PPC].opcode);
         
         // Check for hazards
-        hazardsChecker(memImage);
+        check_hazards(memImage);
         
-        // Execute instruction
-        cout << "| " << setw(5) << clk << " | " << setw(11) << opcodeToString(memImage[PPC].opcode) 
-             << " | " << setw(4) << (PPC * 4) << " | ";
         
         int newPC = executeInstruction(memImage[PPC]);
-        
-        if (newPC != PPC + 1) {
-            cout << "Branch taken to PC=" << (newPC * 4);
-        } else {
-            cout << "Normal execution";
-        }
-        cout << endl;
         
         PPC = newPC;
         Instn_idx++;
         clk++;
         
         // Add stall cycles
-        if (RawHazDict[Instn_idx-1] != 0) {
-            int stallCycles = (RawHazDict[Instn_idx-1] == -1) ? 2 : 1;
+        if (RAWhaz[Instn_idx-1] != 0) {
+            int stallCycles = (RAWhaz[Instn_idx-1] == -1) ? 2 : 1;
             for (int i = 0; i < stallCycles; i++) {
-                cout << "| " << setw(5) << clk << " | " << setw(11) << "STALL" 
-                     << " | " << setw(4) << "----" << " | RAW Hazard detected" << endl;
+                
                 clk++;
             }
         }
         
-        if (Flag2Dict[Instn_idx-1] != 0) {
+        if (branch_pen[Instn_idx-1] != 0) {
             for (int i = 0; i < 2; i++) {
-                cout << "| " << setw(5) << clk << " | " << setw(11) << "STALL" 
-                     << " | " << setw(4) << "----" << " | Branch penalty" << endl;
+                
                 clk++;
             }
         }
     }
 
     if (PPC < mem_size && memImage[PPC].opcode == HALT) {
-        cout << "| " << setw(5) << clk << " | " << setw(11) << "HALT" 
-             << " | " << setw(4) << (PPC * 4) << " | Program terminated" << endl;
+        
         updateInstructionStats(HALT);
     }
 
     cout << "\n";
-    //display();
     
     return EXIT_SUCCESS;
     

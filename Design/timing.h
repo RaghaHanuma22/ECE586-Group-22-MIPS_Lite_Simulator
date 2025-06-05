@@ -4,7 +4,7 @@
 extern unsigned int prog_count;
 int pipesim(const char* filename);
 void display();
-void pipe_stats();
+void pipe_stats(int mode);
 
 
 #endif

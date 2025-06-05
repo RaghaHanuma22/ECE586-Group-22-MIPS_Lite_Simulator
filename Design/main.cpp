@@ -30,20 +30,18 @@
             }
         }
         
-        printf("\nLoaded %d words into memory", address);
+        printf("\nLoaded %d words into memory\n", address);
         fclose(fd);
     }
 
 int main(int argc, char* argv[]) {
 
     const char *filename =argv[1];
+    int mode = atoi(argv[2]);  // 0 = none, 1 = no-forwarding only, 2 = with-forwarding only
 
 loadMemory(filename);
 
-// Option 1: Execute instructions from the same memory image
-printf("\n\n--- Option 1: Executing instructions from memory ---\n");
-
-unsigned int instruction_count = 5;
+unsigned int instruction_count = 1000;
 
 for(int i = 0; i < instruction_count; i++) {
     unsigned int instr_address = memory[PC];
@@ -51,7 +49,6 @@ for(int i = 0; i < instruction_count; i++) {
     inst.instr = instr_address;
 
    if(inst.I_type.opcode == 0b010001){
-    printf("Halt instruction executed! Terminating program!");
     break;
    }
    else if(inst.instr ==0x00000000){
@@ -59,7 +56,7 @@ for(int i = 0; i < instruction_count; i++) {
    }
    else{
     executeInstruction();
-    PC+=1;
+   PC++;
    }
     
     
@@ -70,6 +67,6 @@ pipesim(filename);
  display();
  printstate();
 
- pipe_stats();
+ pipe_stats(mode);
     return 0;
 }
