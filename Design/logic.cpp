@@ -9,6 +9,7 @@ using namespace std;
 
 
 
+
 // Define opcode values
 enum Opcode {
     ADD = 0b000000,
@@ -32,14 +33,24 @@ enum Opcode {
 };
 
 // Simulate 32 general purpose registers
-int registers[31] = {0};
-const int R0 = 0;
+int registers[31] = {0};  // Only R1 to R31
+
+int get_register(int i) {
+    return (i == 0) ? 0 : registers[i - 1];
+}
+
+void set_register(int i, int val) {
+    if (i != 0) registers[i - 1] = val;
+}
+
+//const int registers[0] = 0;
+int d_memory[MEMORY_SIZE] = {0};
+
 
 
 // ALU logic
 int startop(int opcode, int operand1, int operand2, int location) {
     int temp = 0;
-    printf("Opcode for now is = %d",opcode);
     switch (opcode) {
         
         case ADD: {
@@ -108,31 +119,34 @@ int startop(int opcode, int operand1, int operand2, int location) {
         break;
         } 
 
-        case BZ:
+        case BZ: {
         if(operand1 == 0) {
-            return operand2;
+            return ((PC - 1) + location);
         }
         else {
             return PC;
         }
         break;
+    }
 
-        case BEQ:
+        case BEQ:{
         if(operand1 == operand2){
-            return location;
+            return ((PC - 1) + location);
+            
         }
         else {
             return PC;
         }
         break;
+    }
 
         case JR:
         return operand1;
         break;
 
         case HALT:
-        printf("Halt instruction executed! Terminating program!");
-        exit(0);
+        
+        //exit(0);
         break;
 
         default:
@@ -153,29 +167,32 @@ void executeInstruction() {
  
     // Check if the instruction is immediate or not
     bool isImmediate = (opcode == ADDI || opcode == SUBI || opcode == MULI ||
-                        opcode == ANDI || opcode == ORI || opcode == XORI || opcode == LDW || opcode == BZ || opcode == BEQ);
+                        opcode == ANDI || opcode == ORI || opcode == XORI || opcode == LDW || opcode == BZ || opcode == BEQ || opcode ==JR);
                         
 
     // Get the values from registers
     int operand1 = registers[rs];
     int operand2 = (opcode == BEQ)? registers[rt] : isImmediate ? immediate : registers[rt];
-    int location = (opcode == BEQ)? immediate : 0;
+    int location = (opcode == BEQ | BZ)? immediate : 0;
     int result = startop(opcode, operand1, operand2,location);
 
     //For store word instructions
     if(opcode==SDW){
         int temp = registers[rs] + immediate;
-        memory[temp/4] = registers[rt];
-        printf("\nData written at %0d is %0d",temp/4,registers[rt]);
+        d_memory[temp/4] = registers[rt];
     }
 
 
     // For all instructions, immediate or not, store result in rt (I-type) or rd (R-type)
-    if (isImmediate & ~(opcode == BZ))
+    if (isImmediate & ~(opcode == BZ) & ~(opcode == BEQ) & ~(opcode == JR)){
         registers[rt] = result;
-    else if (opcode == BZ | opcode == BEQ | opcode == JR)
+}
+    else if (opcode == BZ | opcode == BEQ)
     {
         PC = result;
+    }
+    else if (opcode == JR){
+        PC = ((result/4) - 1);
     }
     
     else
@@ -183,20 +200,23 @@ void executeInstruction() {
 }
 
 
-void printRegisters() {
-    cout << "\nRegisters:\n";
-    cout << "R0: " <<R0 << "\n";
-    for (int i = 1; i < 32; ++i) {
-        cout << "R" << i << ": " << registers[i] << "\n";
-    }
-    printf("PC: %0d\n",(PC+1)*4);
-}
+void printstate() {
+    cout << "\nFinal register state:\n";
+    printf("\nProgram Counter: %0d\n", (PC + 1) * 4);
 
-void print_mem() {
-    cout << "\nMemory:\n";
-    for (int i = 0; i < 6; ++i) {
-        if (memory[i] != 0) { // Print only non-zero memory locations
-            cout << "Address " << i * 4 << ": " << memory[i] << "\n";
+    for (int i = 1; i < 32; ++i) {
+        if(registers[i]){
+            cout << "R" << i << ": " << registers[i] << "\n";
+        }
+
+    }
+
+    
+
+    cout << "\nMemory State:\n";
+    for (int i = 0; i < 2048; i++) {
+        if (d_memory[i] != 0) { // Print only non-zero memory locations
+            cout << "Address " << i * 4 << ", Contents:  " << d_memory[i] << "\n";
         }
     }
 }

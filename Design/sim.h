@@ -3,7 +3,6 @@
 
 void executeInstruction();
 int startop(int opcode, int operand1, int operand2);
-void printRegisters();
-void print_mem();
+void printstate();
 
 #endif

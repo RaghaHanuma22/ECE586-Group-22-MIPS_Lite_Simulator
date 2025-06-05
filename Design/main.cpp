@@ -30,70 +30,43 @@
             }
         }
         
-        printf("\nLoaded %d words into memory", address);
+        printf("\nLoaded %d words into memory\n", address);
         fclose(fd);
     }
 
-int main() {
+int main(int argc, char* argv[]) {
 
+    const char *filename =argv[1];
+    int mode = atoi(argv[2]);  // 0 = none, 1 = no-forwarding only, 2 = with-forwarding only
 
-const char *filename = "store_word_test.txt";
 loadMemory(filename);
 
-// Option 1: Execute instructions from the same memory image
-printf("\n\n--- Option 1: Executing instructions from memory ---");
-
-unsigned int instruction_count = 25;
+unsigned int instruction_count = 1000;
 
 for(int i = 0; i < instruction_count; i++) {
     unsigned int instr_address = memory[PC];
 
     inst.instr = instr_address;
 
-   
+   if(inst.I_type.opcode == 0b010001){
+    break;
+   }
+   else if(inst.instr ==0x00000000){
+    continue;
+   }
+   else{
     executeInstruction();
-    printRegisters();
-    PC+=1;
-    print_mem();
+   PC++;
+   }
+    
+    
 
 }
+//PIPELINE SIMULATOR FUNCTION
+pipesim(filename);
+ display();
+ printstate();
+
+ pipe_stats(mode);
     return 0;
 }
-
-
-
-
-/*
-
-    const char *filename = "testing_img.txt";
-    FILE *fd = fopen(filename, "r");
-
-    if(fd) {
-        printf("\nFile opened");
-    }
-    else {
-        printf("\nFile not opened");
-    }
-
-    char line[256];  // Buffer to hold each line
-    unsigned int address;
-
-    while(fgets(line,sizeof(line),fd)) {
-        if(line[0] != '\0' && line[1] != '\0'){
-            if(sscanf(line,"%x",&address) == 1){
-                printf("\nAddress in Hex: %x",address);
-                inst.instr = address; //40 - 0000 0100
-                printf("\n Instruction = %x",inst.instr);
-                printf("\n I Type: opcode = %x",inst.I_type.opcode);
-                printf("\n R Type: opcode = %x",inst.R_type.opcode);
-                executeInstruction();
-                printRegisters();
-            }
-            else {
-                printf("\nParsing failed!");
-            }
-        }
-    }
-
-    fclose(fd);
-    */
